@@ -1,0 +1,158 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Digital Wallet Fintech Design System - All colors MUST be HSL */
+
+@layer base {
+  :root {
+    --background: 240 10% 3.9%;
+    --foreground: 0 0% 98%;
+
+    --card: 240 10% 3.9%;
+    --card-foreground: 0 0% 98%;
+
+    --popover: 240 10% 3.9%;
+    --popover-foreground: 0 0% 98%;
+
+    --primary: 263 70% 50.4%;
+    --primary-foreground: 0 0% 98%;
+
+    --secondary: 240 4.8% 95.9%;
+    --secondary-foreground: 240 5.9% 10%;
+
+    --muted: 240 4.8% 95.9%;
+    --muted-foreground: 240 3.8% 46.1%;
+
+    --accent: 240 4.8% 95.9%;
+    --accent-foreground: 240 5.9% 10%;
+
+    --destructive: 0 84.2% 60.2%;
+    --destructive-foreground: 0 0% 98%;
+
+    --border: 240 5.9% 90%;
+    --input: 240 5.9% 90%;
+    --ring: 263 70% 50.4%;
+
+    /* Fintech-specific colors */
+    --wallet-primary: 263 70% 50.4%;
+    --wallet-secondary: 217 91% 59.8%;
+    --wallet-success: 142 76% 36%;
+    --wallet-warning: 38 92% 50%;
+    --wallet-danger: 0 84% 60%;
+
+    /* Gradients */
+    --gradient-primary: linear-gradient(135deg, hsl(263 70% 50.4%), hsl(217 91% 59.8%));
+    --gradient-secondary: linear-gradient(135deg, hsl(240 10% 3.9%), hsl(240 5.9% 10%));
+    --gradient-success: linear-gradient(135deg, hsl(142 76% 36%), hsl(120 76% 50%));
+
+    /* Shadows */
+    --shadow-wallet: 0 10px 30px -5px hsl(263 70% 50.4% / 0.3);
+    --shadow-card: 0 4px 20px -2px hsl(240 10% 3.9% / 0.1);
+    --shadow-elevated: 0 20px 40px -10px hsl(263 70% 50.4% / 0.4);
+
+    --radius: 0.5rem;
+
+    --sidebar-background: 0 0% 98%;
+
+    --sidebar-foreground: 240 5.3% 26.1%;
+
+    --sidebar-primary: 240 5.9% 10%;
+
+    --sidebar-primary-foreground: 0 0% 98%;
+
+    --sidebar-accent: 240 4.8% 95.9%;
+
+    --sidebar-accent-foreground: 240 5.9% 10%;
+
+    --sidebar-border: 220 13% 91%;
+
+    --sidebar-ring: 217.2 91.2% 59.8%;
+  }
+
+  .light {
+    --background: 0 0% 100%;
+    --foreground: 240 10% 3.9%;
+
+    --card: 0 0% 100%;
+    --card-foreground: 240 10% 3.9%;
+
+    --popover: 0 0% 100%;
+    --popover-foreground: 240 10% 3.9%;
+
+    --primary: 263 70% 50.4%;
+    --primary-foreground: 0 0% 98%;
+
+    --secondary: 240 4.8% 95.9%;
+    --secondary-foreground: 240 5.9% 10%;
+
+    --muted: 240 4.8% 95.9%;
+    --muted-foreground: 240 3.8% 46.1%;
+
+    --accent: 240 4.8% 95.9%;
+    --accent-foreground: 240 5.9% 10%;
+
+    --destructive: 0 84.2% 60.2%;
+    --destructive-foreground: 0 0% 98%;
+
+    --border: 240 5.9% 90%;
+    --input: 240 5.9% 90%;
+    --ring: 263 70% 50.4%;
+    --sidebar-background: 240 5.9% 10%;
+    --sidebar-foreground: 240 4.8% 95.9%;
+    --sidebar-primary: 224.3 76.3% 48%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 240 3.7% 15.9%;
+    --sidebar-accent-foreground: 240 4.8% 95.9%;
+    --sidebar-border: 240 3.7% 15.9%;
+    --sidebar-ring: 217.2 91.2% 59.8%;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+
+  body {
+    @apply bg-background text-foreground font-sans;
+  }
+
+  html {
+    @apply scroll-smooth;
+  }
+}
+
+@layer components {
+  .wallet-gradient {
+    @apply bg-gradient-to-br from-primary to-blue-500;
+  }
+  
+  .wallet-card {
+    @apply bg-card border border-border rounded-2xl p-6 shadow-[var(--shadow-card)];
+  }
+  
+  .wallet-button-primary {
+    @apply bg-gradient-to-r from-primary to-blue-500 hover:from-primary/90 hover:to-blue-500/90 text-primary-foreground font-medium px-6 py-3 rounded-xl transition-all duration-200 shadow-[var(--shadow-wallet)];
+  }
+  
+  .wallet-button-secondary {
+    @apply bg-secondary hover:bg-secondary/80 text-secondary-foreground font-medium px-6 py-3 rounded-xl transition-all duration-200;
+  }
+
+  .wallet-input {
+    @apply bg-card border-2 border-border focus:border-primary rounded-xl px-4 py-3 transition-all duration-200 focus:shadow-[var(--shadow-wallet)];
+  }
+
+  .bottom-nav-item {
+    @apply flex flex-col items-center justify-center p-3 rounded-xl transition-all duration-200 hover:bg-accent;
+  }
+
+  .bottom-nav-active {
+    @apply bg-primary/10 text-primary;
+  }
+
+  .transaction-item {
+    @apply flex items-center justify-between p-4 bg-card rounded-xl border border-border hover:bg-accent/50 transition-all duration-200;
+  }
+}
