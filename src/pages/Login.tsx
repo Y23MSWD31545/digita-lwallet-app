@@ -33,43 +33,58 @@ const Login = ({ setIsAuthenticated }: LoginProps) => {
 
     setLoading(true);
     
-    // [Updated Logic: Mock Authentication]
-    // 1. Retrieve mock credentials saved during signup
-    const storedCredentialsString = localStorage.getItem("mockUserCredentials");
-    let storedCredentials = null;
-    
-    if (storedCredentialsString) {
-      try {
-        storedCredentials = JSON.parse(storedCredentialsString);
-      } catch (e) {
-        console.error("Error parsing stored credentials:", e);
-      }
-    }
-    
-    // 2. Perform validation against stored credentials
-    const isAuthenticatedUser = storedCredentials && 
-                                storedCredentials.username === username && 
-                                storedCredentials.password === password;
+    try {
+      // Call your backend API
+      const response = await fetch("http://localhost:8080/api/users/login", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          username: username,
+          password: password
+        })
+      });
 
-    // Simulate API call delay
-    setTimeout(() => {
-      setLoading(false);
+      const data = await response.json();
 
-      if (isAuthenticatedUser) {
+      if (response.ok) {
+        // Login successful
         setIsAuthenticated(true);
+        
+        // Store user data in localStorage INCLUDING wallet balance
+        localStorage.setItem("user", JSON.stringify({
+          id: data.id,
+          username: data.username,
+          name: data.name,
+          email: data.email,
+          walletBalance: data.walletBalance || 0  // Store wallet balance
+        }));
+
         toast({
           title: "Welcome back!",
-          description: `Login successful for user: ${username}`,
+          description: `${data.message || 'Login successful'}. Your balance: ₹${data.walletBalance || 0}`,
         });
+        
         navigate("/dashboard");
       } else {
+        // Login failed
         toast({
           title: "Login Failed",
-          description: "Invalid username or password. Please use the credentials you signed up with.",
+          description: data.error || "Invalid username or password",
           variant: "destructive"
         });
       }
-    }, 1000);
+    } catch (error) {
+      console.error("Login error:", error);
+      toast({
+        title: "Connection Error",
+        description: "Unable to connect to server. Please make sure the backend is running on port 8080.",
+        variant: "destructive"
+      });
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (

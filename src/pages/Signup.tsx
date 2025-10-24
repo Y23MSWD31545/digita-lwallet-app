@@ -1,24 +1,20 @@
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
-import { Eye, EyeOff, Wallet, ArrowRight, User, Phone } from "lucide-react";
+import { Eye, EyeOff, Wallet, ArrowRight, User, Phone, Mail } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import { useUser } from "@/contexts/UserContext"; 
 
-// Helper function to generate a secure, mock 6-digit OTP
-const generateOTP = (): string => {
-  return Math.floor(100000 + Math.random() * 900000).toString();
-};
-
 const Signup = () => {
   const [formData, setFormData] = useState({
-    fullName: "",
+    name: "",
     username: "",
-    password: "",
-    mobileNumber: ""
+    email: "",
+    phone: "",
+    password: ""
   });
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -33,9 +29,10 @@ const Signup = () => {
   const handleSignup = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    const { fullName, username, password, mobileNumber } = formData;
+    const { name, username, email, phone, password } = formData;
     
-    if (!fullName || !username || !password || !mobileNumber) {
+    // Validation
+    if (!name || !username || !email || !phone || !password) {
       toast({
         title: "Error",
         description: "Please fill in all fields",
@@ -53,7 +50,7 @@ const Signup = () => {
       return;
     }
 
-    if (mobileNumber.length !== 10) {
+    if (phone.length !== 10) {
       toast({
         title: "Error",
         description: "Please enter a valid 10-digit mobile number",
@@ -62,39 +59,83 @@ const Signup = () => {
       return;
     }
 
+    // Basic email validation
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email)) {
+      toast({
+        title: "Error",
+        description: "Please enter a valid email address",
+        variant: "destructive"
+      });
+      return;
+    }
+
     setLoading(true);
     
-    // Simulate API call and OTP generation
-    setTimeout(() => {
-      setLoading(false);
-      
-      const generatedOtp = generateOTP(); // Generate unique OTP
-
-      // Save credentials for mock validation in Login.tsx
-      localStorage.setItem("mockUserCredentials", JSON.stringify({ 
-          username: username, 
-          password: password 
-      }));
-
-      // Set user data in context for display purposes
-      setUser({
-          fullName: fullName,
-          username: username, 
+    try {
+      // Call your backend API
+      const response = await fetch("http://localhost:8080/api/users/register", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          name: name,
+          username: username,
+          email: email,
+          phone: phone,
+          password: password
+        })
       });
 
+      const data = await response.json();
+
+      if (response.ok) {
+        // Registration successful
+        toast({
+          title: "Success!",
+          description: data.message || "Account created successfully",
+        });
+
+        // Set user data in context
+        if (data.user) {
+          setUser({
+            fullName: data.user.name,
+            username: data.user.username,
+          });
+
+          // Store user data in localStorage
+          localStorage.setItem("user", JSON.stringify({
+            id: data.user.id,
+            username: data.user.username,
+            name: data.user.name,
+            email: data.user.email
+          }));
+        }
+
+        // Navigate to login page after successful registration
+        setTimeout(() => {
+          navigate("/login");
+        }, 1500);
+
+      } else {
+        // Registration failed
+        toast({
+          title: "Registration Failed",
+          description: data.error || data || "Unable to create account",
+          variant: "destructive"
+        });
+      }
+    } catch (error) {
+      console.error("Signup error:", error);
       toast({
-        title: "OTP Sent (Demo)",
-        description: `The verification code is: ${generatedOtp}.`, // Show OTP in toast for ease of testing
+        title: "Connection Error",
+        description: "Unable to connect to server. Please make sure the backend is running on port 8080.",
+        variant: "destructive"
       });
-      
-      // Pass generated OTP to verification page state
-      navigate("/verify-otp", { 
-          state: { 
-              mobileNumber, 
-              correctOtp: generatedOtp 
-          } 
-      });
-    }, 1000);
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -128,15 +169,15 @@ const Signup = () => {
         >
           <form onSubmit={handleSignup} className="space-y-4">
             <div className="space-y-2">
-              <Label htmlFor="fullName">Full Name</Label>
+              <Label htmlFor="name">Full Name</Label>
               <div className="relative">
                 <User className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground w-4 h-4" />
                 <Input
-                  id="fullName"
+                  id="name"
                   type="text"
                   placeholder="Enter your full name"
-                  value={formData.fullName}
-                  onChange={(e) => handleInputChange("fullName", e.target.value)}
+                  value={formData.name}
+                  onChange={(e) => handleInputChange("name", e.target.value)}
                   className="wallet-input pl-10"
                 />
               </div>
@@ -155,15 +196,30 @@ const Signup = () => {
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="mobileNumber">Mobile Number</Label>
+              <Label htmlFor="email">Email</Label>
+              <div className="relative">
+                <Mail className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground w-4 h-4" />
+                <Input
+                  id="email"
+                  type="email"
+                  placeholder="Enter your email"
+                  value={formData.email}
+                  onChange={(e) => handleInputChange("email", e.target.value)}
+                  className="wallet-input pl-10"
+                />
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="phone">Mobile Number</Label>
               <div className="relative">
                 <Phone className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground w-4 h-4" />
                 <Input
-                  id="mobileNumber"
+                  id="phone"
                   type="tel"
                   placeholder="Enter 10-digit mobile number"
-                  value={formData.mobileNumber}
-                  onChange={(e) => handleInputChange("mobileNumber", e.target.value.replace(/\D/g, "").slice(0, 10))}
+                  value={formData.phone}
+                  onChange={(e) => handleInputChange("phone", e.target.value.replace(/\D/g, "").slice(0, 10))}
                   className="wallet-input pl-10"
                 />
               </div>

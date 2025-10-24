@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import { 
   Eye, 
@@ -17,17 +17,13 @@ import {
   Utensils 
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Card } from "@/components/ui/card";
 import { useNavigate } from "react-router-dom";
 import { useWallet } from "@/contexts/WalletContext";
 import BottomNavigation from "@/components/BottomNavigation";
 import { Skeleton } from "@/components/ui/skeleton";
 
-// Helper to resolve the Icon component, fixing the "object" vs "function" error
+// Helper to resolve the Icon component
 const resolveIconComponent = (icon: any) => {
-  // If the icon object has a '$$typeof' property, React treats it as a valid element/component type.
-  // Otherwise, if it's an object with a 'default' export (common with module resolution), use that.
-  // If neither, return the original or null to prevent crash.
   if (typeof icon === 'object' && icon !== null && icon.default) {
     return icon.default;
   }
@@ -36,9 +32,24 @@ const resolveIconComponent = (icon: any) => {
 
 const Dashboard = () => {
   const [showBalance, setShowBalance] = useState(true);
+  const [loading, setLoading] = useState(true);
   const navigate = useNavigate();
-  // Ensure useWallet hook is called correctly.
-  const { walletBalance, transactions } = useWallet();
+  const { walletBalance, transactions, refreshBalance } = useWallet();
+
+  // Refresh balance when dashboard loads
+  useEffect(() => {
+    const loadDashboard = async () => {
+      try {
+        await refreshBalance();
+      } catch (error) {
+        console.error('Error loading dashboard:', error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    loadDashboard();
+  }, []);
 
   const quickActions = [
     { icon: QrCode, label: "Scan QR", path: "/scan-qr", color: "from-blue-500 to-blue-600" },
@@ -47,7 +58,7 @@ const Dashboard = () => {
     { icon: Plus, label: "Add Money", path: "/add-money", color: "from-orange-500 to-orange-600" },
   ];
 
-  // Safely handle transactions being null/undefined before slice
+  // Safely handle transactions
   const safeTransactions = transactions || [];
 
   // Get recent transactions from context
@@ -58,50 +69,34 @@ const Dashboard = () => {
     subtitle: transaction.subtitle,
     amount: transaction.amount,
     time: `${transaction.date} ${transaction.time}`,
-    
-    // Logic for icon rendering: Get the icon or assign a fallback based on category
     icon: resolveIconComponent(
-        transaction.icon 
-            ? transaction.icon 
-            : transaction.type === "credit" 
-                ? ArrowDownLeft 
-                : transaction.category === "bill_payment" 
-                    ? Zap 
-                    : transaction.category === "money_sent"
-                        ? ArrowUpRight
-                        : Utensils
+      transaction.icon 
+        ? transaction.icon 
+        : transaction.type === "credit" 
+          ? ArrowDownLeft 
+          : transaction.category === "bill_payment" 
+            ? Zap 
+            : transaction.category === "money_sent"
+              ? ArrowUpRight
+              : Utensils
     )
   }));
 
-  // Add a simple loading state check. walletBalance should now be a number (or 0)
-  // based on the fixed WalletContext.
-  if (walletBalance === 0 && safeTransactions.length === 0) {
-      // You may still see this if localStorage is empty and state hasn't fully hydrated.
-      // Returning null instead of Skeleton will prevent a crash if Skeleton is also the issue,
-      // but let's stick with Skeleton for better UX while checking the ultimate fix.
-      // If the page is truly blank, it's crashing here.
-      if (typeof Skeleton === 'object' && Skeleton !== null) {
-         // Fallback if Skeleton module is imported incorrectly (which may be the root cause)
-         return (
-             <div className="min-h-screen bg-background p-6 text-foreground pt-16 text-center">
-                 Loading Dashboard... (Check console for module errors)
-             </div>
-         );
-      }
-      return (
-          <div className="min-h-screen bg-background p-6">
-              <div className="pt-12 space-y-4">
-                  <Skeleton className="w-40 h-8 bg-muted" />
-                  <Skeleton className="w-full h-32 rounded-2xl bg-muted" />
-                  <div className="grid grid-cols-2 gap-4">
-                      <Skeleton className="w-full h-20 rounded-xl bg-muted" />
-                      <Skeleton className="w-full h-20 rounded-xl bg-muted" />
-                  </div>
-              </div>
+  // Show loading skeleton while fetching data
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-background p-6">
+        <div className="pt-12 space-y-4">
+          <Skeleton className="w-40 h-8 bg-muted" />
+          <Skeleton className="w-full h-32 rounded-2xl bg-muted" />
+          <div className="grid grid-cols-2 gap-4">
+            <Skeleton className="w-full h-20 rounded-xl bg-muted" />
+            <Skeleton className="w-full h-20 rounded-xl bg-muted" />
           </div>
-      );
+        </div>
+      </div>
+    );
   }
-
 
   return (
     <div className="min-h-screen bg-background pb-20">
@@ -149,7 +144,7 @@ const Dashboard = () => {
           </div>
           <div className="flex items-center gap-2">
             <span className="text-white text-3xl font-bold">
-              {/* Safely display balance */}
+              {/* Display balance from backend */}
               ₹{showBalance ? walletBalance.toLocaleString() : "••••••"} 
             </span>
             {showBalance && (
@@ -171,20 +166,20 @@ const Dashboard = () => {
           transition={{ delay: 0.3 }}
           className="grid grid-cols-2 gap-4"
         >
-            {quickActions.map((action, index) => (
-              <motion.button
-                key={action.path}
-                initial={{ opacity: 0, scale: 0.9 }}
-                animate={{ opacity: 1, scale: 1 }}
-                transition={{ delay: 0.4 + index * 0.1 }}
-                whileTap={{ scale: 0.95 }}
-                onClick={() => navigate(action.path)}
-                className={`bg-gradient-to-r ${action.color} p-4 rounded-xl text-white shadow-lg hover:shadow-xl transition-all`}
-              >
-                <action.icon size={24} className="mb-2" />
-                <span className="text-sm font-medium block">{action.label}</span>
-              </motion.button>
-            ))}
+          {quickActions.map((action, index) => (
+            <motion.button
+              key={action.path}
+              initial={{ opacity: 0, scale: 0.9 }}
+              animate={{ opacity: 1, scale: 1 }}
+              transition={{ delay: 0.4 + index * 0.1 }}
+              whileTap={{ scale: 0.95 }}
+              onClick={() => navigate(action.path)}
+              className={`bg-gradient-to-r ${action.color} p-4 rounded-xl text-white shadow-lg hover:shadow-xl transition-all`}
+            >
+              <action.icon size={24} className="mb-2" />
+              <span className="text-sm font-medium block">{action.label}</span>
+            </motion.button>
+          ))}
         </motion.div>
       </div>
 
@@ -197,14 +192,20 @@ const Dashboard = () => {
         >
           <div className="flex items-center justify-between mb-4">
             <h2 className="text-lg font-semibold text-foreground">Recent Transactions</h2>
-            <Button variant="ghost" size="sm" className="text-primary" onClick={() => navigate("/transaction-history")}>
+            <Button 
+              variant="ghost" 
+              size="sm" 
+              className="text-primary" 
+              onClick={() => navigate("/transaction-history")}
+            >
               View All
             </Button>
           </div>
 
-          <div className="space-y-3">
-            {recentTransactions.map((transaction, index) => {
-                const IconComponent = transaction.icon; // Use the resolved icon component
+          {recentTransactions.length > 0 ? (
+            <div className="space-y-3">
+              {recentTransactions.map((transaction, index) => {
+                const IconComponent = transaction.icon;
                 return (
                   <motion.div
                     key={transaction.id}
@@ -219,7 +220,6 @@ const Dashboard = () => {
                           ? "bg-green-500/10 text-green-500" 
                           : "bg-red-500/10 text-red-500"
                       }`}>
-                        {/* Render the resolved icon component */}
                         {IconComponent && <IconComponent size={18} />} 
                       </div>
                       <div className="flex-1">
@@ -237,8 +237,14 @@ const Dashboard = () => {
                     </div>
                   </motion.div>
                 );
-            })}
-          </div>
+              })}
+            </div>
+          ) : (
+            <div className="text-center py-8 text-muted-foreground">
+              <p className="text-sm">No transactions yet</p>
+              <p className="text-xs mt-1">Start using your wallet to see transactions here</p>
+            </div>
+          )}
         </motion.div>
 
         {/* Offers Banner */}

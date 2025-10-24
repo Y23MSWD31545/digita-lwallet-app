@@ -15,7 +15,7 @@ const AddMoney = () => {
   const [isProcessing, setIsProcessing] = useState(false);
   const [showSuccess, setShowSuccess] = useState(false);
   const navigate = useNavigate();
-  const { updateBalance, addTransaction } = useWallet();
+  const { addMoney } = useWallet(); // Use the new addMoney function
   const { toast } = useToast();
 
   const quickAmounts = [500, 1000, 2000, 5000];
@@ -38,32 +38,33 @@ const AddMoney = () => {
 
     setIsProcessing(true);
 
-    // Simulate processing
-    await new Promise(resolve => setTimeout(resolve, 2000));
+    try {
+      const amountValue = parseFloat(amount);
+      
+      // Call backend API to add money
+      await addMoney(amountValue);
 
-    const amountValue = parseFloat(amount);
-    
-    // Add money to wallet
-    updateBalance(amountValue, "credit");
-    
-    // Add transaction
-    addTransaction({
-      type: "credit",
-      category: "money_added",
-      title: "Money Added",
-      subtitle: `Via ${paymentMethods.find(m => m.id === selectedMethod)?.label}`,
-      amount: amountValue,
-      status: "success",
-      icon: Plus
-    });
+      setIsProcessing(false);
+      setShowSuccess(true);
 
-    setIsProcessing(false);
-    setShowSuccess(true);
+      toast({
+        title: "Success!",
+        description: `₹${amountValue.toLocaleString()} added to your wallet`,
+      });
 
-    // Redirect after success
-    setTimeout(() => {
-      navigate("/dashboard");
-    }, 2000);
+      // Redirect after success
+      setTimeout(() => {
+        navigate("/dashboard");
+      }, 2000);
+
+    } catch (error: any) {
+      setIsProcessing(false);
+      toast({
+        title: "Error",
+        description: error.message || "Failed to add money. Please try again.",
+        variant: "destructive",
+      });
+    }
   };
 
   if (showSuccess) {
@@ -204,7 +205,7 @@ const AddMoney = () => {
         >
           <Button
             onClick={handleAddMoney}
-            disabled={!amount || parseFloat(amount) <= 0}
+            disabled={!amount || parseFloat(amount) <= 0 || isProcessing}
             className="w-full h-14 text-lg font-semibold wallet-button-primary"
           >
             Add ₹{amount ? parseFloat(amount).toLocaleString() : "0"} to Wallet

@@ -1,225 +1,202 @@
-import React, { createContext, useContext, useState, useEffect, ReactNode } from "react";
-import { Plus, ArrowDownLeft, Zap, Utensils, ArrowUpRight } from "lucide-react"; // Import ALL necessary icons
+import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 
-export interface Transaction {
+interface Transaction {
   id: string;
-  type: "credit" | "debit";
-  category: "money_received" | "money_sent" | "bill_payment" | "money_added" | "qr_payment" | "food_dining";
+  type: 'credit' | 'debit';
   title: string;
   subtitle: string;
   amount: number;
   date: string;
   time: string;
-  status: "success" | "failed";
-  icon: React.ComponentType | any; // Use React.ComponentType for clarity
+  category: string;
+  icon?: any;
 }
 
 interface WalletContextType {
   walletBalance: number;
   transactions: Transaction[];
-  addTransaction: (transaction: Omit<Transaction, "id" | "date" | "time" | "status"> & { status?: "success" | "failed" }) => void;
-  updateBalance: (amount: number, type: "credit" | "debit") => void;
-  processPayment: (amount: number, recipient: string, category: Transaction["category"], title: string) => Promise<boolean>;
+  addMoney: (amount: number) => Promise<void>;
+  sendMoney: (amount: number, recipient: string) => Promise<void>;
+  refreshBalance: () => Promise<void>;
 }
 
-// Helper to get the correct icon component based on category/type
-const getIconForTransaction = (transaction: Omit<Transaction, "id" | "date" | "time" | "status"> & { status?: "success" | "failed" }): React.ComponentType | any => {
-    if (transaction.icon) return transaction.icon;
-    
-    switch (transaction.category) {
-        case "money_added":
-            return Plus;
-        case "money_received":
-            return ArrowDownLeft;
-        case "bill_payment":
-            return Zap;
-        case "food_dining":
-            return Utensils;
-        case "money_sent":
-        case "qr_payment":
-            return ArrowUpRight;
-        default:
-            return ArrowUpRight; // Default debit icon
-    }
-}
-
-// Mock transaction data to seed the history
-const MOCK_INITIAL_TRANSACTIONS: Transaction[] = [
-  {
-    id: "TXN123456",
-    type: "debit",
-    category: "food_dining",
-    title: "Food & Dining",
-    subtitle: "Local Cafe",
-    amount: 1200,
-    date: "2024-10-14",
-    time: "18:30",
-    status: "success",
-    icon: Utensils // Pass the raw component
-  },
-  {
-    id: "TXN654321",
-    type: "debit",
-    category: "bill_payment",
-    title: "Electricity Bill",
-    subtitle: "MSEB",
-    amount: 2800,
-    date: "2024-10-13",
-    time: "11:00",
-    status: "success",
-    icon: Zap // Pass the raw component
-  },
-  {
-    id: "TXN000001",
-    type: "credit",
-    category: "money_added",
-    title: "Money Added",
-    subtitle: "Via Bank",
-    amount: 5000,
-    date: "2024-10-12",
-    time: "10:00",
-    status: "success",
-    icon: Plus // Pass the raw component
-  }
-];
-
-// Initialize the context with undefined, asserting the type
 const WalletContext = createContext<WalletContextType | undefined>(undefined);
 
-export const useWallet = () => {
-  const context = useContext(WalletContext);
-  if (!context) {
-    throw new Error("useWallet must be used within a WalletProvider");
-  }
-  return context;
-};
-
 export const WalletProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
-  const [walletBalance, setWalletBalance] = useState<number>(() => {
-    const saved = localStorage.getItem("walletBalance");
-    return saved ? parseFloat(saved) : 12547.50; 
-  });
+  const [walletBalance, setWalletBalance] = useState<number>(0);
+  const [transactions, setTransactions] = useState<Transaction[]>([]);
 
-  const [transactions, setTransactions] = useState<Transaction[]>(() => {
-    const saved = localStorage.getItem("transactions");
-    if (!saved) {
-        return MOCK_INITIAL_TRANSACTIONS; 
-    }
-    
-    try {
-        const parsed = JSON.parse(saved);
-        // CRITICAL: Since JSON.parse can't serialize React components (icons),
-        // we must fall back to the initial mock data if we find a transaction missing the icon property 
-        // (which only happens after reloading from localStorage).
-        const hasIcons = parsed.every((t: any) => t.icon !== undefined);
-        return Array.isArray(parsed) && hasIcons ? parsed : MOCK_INITIAL_TRANSACTIONS; 
-    } catch (e) {
-        console.error("Error parsing transactions from localStorage:", e);
-        return MOCK_INITIAL_TRANSACTIONS; 
-    }
-  });
-
+  // Load user's balance from localStorage on mount
   useEffect(() => {
-    // CRITICAL: We only save non-component data to localStorage.
-    // In a real app, you'd save the category string and re-derive the icon on load.
-    // For this demo, we save everything *except* the icon property to prevent corruption.
-    const transactionsWithoutIcons = transactions.map(({ icon, ...rest }) => rest);
-    localStorage.setItem("transactions", JSON.stringify(transactionsWithoutIcons));
-    localStorage.setItem("walletBalance", walletBalance.toString());
-  }, [walletBalance, transactions]);
+    const loadUserData = () => {
+      const userStr = localStorage.getItem('user');
+      if (userStr) {
+        try {
+          const user = JSON.parse(userStr);
+          setWalletBalance(user.walletBalance || 0);
+        } catch (e) {
+          console.error('Error parsing user data:', e);
+        }
+      }
 
-  // NOTE: The rest of the implementation for saving transactions is complex due to the icon issue.
-  // For simplicity and stability, we will rely on re-deriving the icon for transactions saved in storage 
-  // via the Dashboard and TransactionHistory pages. We keep the mock data for stability on first load.
-
-
-  const generateTransactionId = () => {
-    return `TXN${Math.random().toString(36).substr(2, 9).toUpperCase()}`;
-  };
-
-  const addTransaction = (transaction: Omit<Transaction, "id" | "date" | "time" | "status"> & { status?: "success" | "failed" }) => {
-    const now = new Date();
-    
-    // [CRITICAL FIX]: Determine and set the icon component immediately
-    const iconComponent = getIconForTransaction(transaction);
-    
-    const newTransaction: Transaction = {
-      ...transaction,
-      id: generateTransactionId(),
-      date: now.toISOString().split('T')[0],
-      time: now.toTimeString().slice(0, 5),
-      status: transaction.status || "success",
-      icon: iconComponent, // Save the actual component reference
+      // Load transactions from localStorage
+      const transactionsStr = localStorage.getItem('transactions');
+      if (transactionsStr) {
+        try {
+          const loadedTransactions = JSON.parse(transactionsStr);
+          setTransactions(loadedTransactions);
+        } catch (e) {
+          console.error('Error parsing transactions:', e);
+        }
+      }
     };
 
-    setTransactions(prev => [newTransaction, ...prev]);
+    loadUserData();
+  }, []);
+
+  // Refresh balance from backend
+  const refreshBalance = async () => {
+    const userStr = localStorage.getItem('user');
+    if (!userStr) return;
+
+    try {
+      const user = JSON.parse(userStr);
+      const response = await fetch(`http://localhost:8080/api/wallet/balance/${user.id}`);
+      const data = await response.json();
+
+      if (response.ok) {
+        setWalletBalance(data.walletBalance);
+        
+        // Update localStorage
+        user.walletBalance = data.walletBalance;
+        localStorage.setItem('user', JSON.stringify(user));
+      }
+    } catch (error) {
+      console.error('Error refreshing balance:', error);
+    }
   };
 
-  const updateBalance = (amount: number, type: "credit" | "debit") => {
-    setWalletBalance(prev => {
-      const newBalance = type === "credit" ? prev + amount : prev - amount;
-      return Math.max(0, newBalance);
-    });
+  // Add money to wallet
+  const addMoney = async (amount: number) => {
+    const userStr = localStorage.getItem('user');
+    if (!userStr) throw new Error('User not logged in');
+
+    try {
+      const user = JSON.parse(userStr);
+      const response = await fetch('http://localhost:8080/api/wallet/add-money', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          userId: user.id,
+          amount: amount
+        })
+      });
+
+      const data = await response.json();
+
+      if (response.ok) {
+        // Update balance
+        setWalletBalance(data.newBalance);
+        
+        // Update localStorage
+        user.walletBalance = data.newBalance;
+        localStorage.setItem('user', JSON.stringify(user));
+
+        // Add transaction
+        const newTransaction: Transaction = {
+          id: Date.now().toString(),
+          type: 'credit',
+          title: 'Money Added',
+          subtitle: 'Added to wallet',
+          amount: amount,
+          date: new Date().toLocaleDateString(),
+          time: new Date().toLocaleTimeString(),
+          category: 'add_money'
+        };
+
+        const updatedTransactions = [newTransaction, ...transactions];
+        setTransactions(updatedTransactions);
+        localStorage.setItem('transactions', JSON.stringify(updatedTransactions));
+      } else {
+        throw new Error(data.error || 'Failed to add money');
+      }
+    } catch (error) {
+      console.error('Add money error:', error);
+      throw error;
+    }
   };
 
-  const processPayment = async (
-    amount: number, 
-    recipient: string, 
-    category: Transaction["category"],
-    title: string
-  ): Promise<boolean> => {
-    await new Promise(resolve => setTimeout(resolve, 2000));
-    
-    if (walletBalance < amount) {
-        addTransaction({
-            type: "debit",
-            category,
-            title,
-            subtitle: recipient,
-            amount,
-            status: "failed",
-            icon: null 
-        });
-        return false;
-    }
+  // Send money from wallet
+  const sendMoney = async (amount: number, recipient: string) => {
+    const userStr = localStorage.getItem('user');
+    if (!userStr) throw new Error('User not logged in');
 
-    const isSuccess = Math.random() > 0.1;
-    
-    if (isSuccess) {
-      updateBalance(amount, "debit");
-      addTransaction({
-        type: "debit",
-        category,
-        title,
-        subtitle: recipient,
-        amount,
-        status: "success",
-        icon: null // The addTransaction function will resolve this
+    try {
+      const user = JSON.parse(userStr);
+      const response = await fetch('http://localhost:8080/api/wallet/send-money', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          userId: user.id,
+          amount: amount
+        })
       });
-    } else {
-      addTransaction({
-        type: "debit",
-        category,
-        title,
-        subtitle: recipient,
-        amount,
-        status: "failed",
-        icon: null // The addTransaction function will resolve this
-      });
-    }
 
-    return isSuccess;
+      const data = await response.json();
+
+      if (response.ok) {
+        // Update balance
+        setWalletBalance(data.newBalance);
+        
+        // Update localStorage
+        user.walletBalance = data.newBalance;
+        localStorage.setItem('user', JSON.stringify(user));
+
+        // Add transaction
+        const newTransaction: Transaction = {
+          id: Date.now().toString(),
+          type: 'debit',
+          title: 'Money Sent',
+          subtitle: `To ${recipient}`,
+          amount: amount,
+          date: new Date().toLocaleDateString(),
+          time: new Date().toLocaleTimeString(),
+          category: 'money_sent'
+        };
+
+        const updatedTransactions = [newTransaction, ...transactions];
+        setTransactions(updatedTransactions);
+        localStorage.setItem('transactions', JSON.stringify(updatedTransactions));
+      } else {
+        throw new Error(data.error || 'Failed to send money');
+      }
+    } catch (error) {
+      console.error('Send money error:', error);
+      throw error;
+    }
   };
 
   return (
     <WalletContext.Provider value={{
       walletBalance,
       transactions,
-      addTransaction,
-      updateBalance,
-      processPayment
+      addMoney,
+      sendMoney,
+      refreshBalance
     }}>
       {children}
     </WalletContext.Provider>
   );
+};
+
+export const useWallet = () => {
+  const context = useContext(WalletContext);
+  if (context === undefined) {
+    throw new Error('useWallet must be used within a WalletProvider');
+  }
+  return context;
 };
