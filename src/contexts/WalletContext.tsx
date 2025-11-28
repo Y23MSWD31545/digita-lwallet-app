@@ -9,15 +9,18 @@ interface Transaction {
   date: string;
   time: string;
   category: string;
-  icon?: any;
+  status: string;
+  referenceNumber?: string;
+  recipientUsername?: string;
 }
 
 interface WalletContextType {
   walletBalance: number;
   transactions: Transaction[];
-  addMoney: (amount: number) => Promise<void>;
-  sendMoney: (amount: number, recipient: string) => Promise<void>;
+  addMoney: (amount: number) => Promise<any>;
+  sendMoney: (amount: number, recipientUsername: string) => Promise<any>;
   refreshBalance: () => Promise<void>;
+  refreshTransactions: () => Promise<void>;
 }
 
 const WalletContext = createContext<WalletContextType | undefined>(undefined);
@@ -38,20 +41,10 @@ export const WalletProvider: React.FC<{ children: ReactNode }> = ({ children }) 
           console.error('Error parsing user data:', e);
         }
       }
-
-      // Load transactions from localStorage
-      const transactionsStr = localStorage.getItem('transactions');
-      if (transactionsStr) {
-        try {
-          const loadedTransactions = JSON.parse(transactionsStr);
-          setTransactions(loadedTransactions);
-        } catch (e) {
-          console.error('Error parsing transactions:', e);
-        }
-      }
     };
 
     loadUserData();
+    refreshTransactions();
   }, []);
 
   // Refresh balance from backend
@@ -73,6 +66,24 @@ export const WalletProvider: React.FC<{ children: ReactNode }> = ({ children }) 
       }
     } catch (error) {
       console.error('Error refreshing balance:', error);
+    }
+  };
+
+  // Refresh transactions from backend
+  const refreshTransactions = async () => {
+    const userStr = localStorage.getItem('user');
+    if (!userStr) return;
+
+    try {
+      const user = JSON.parse(userStr);
+      const response = await fetch(`http://localhost:8080/api/wallet/transactions/${user.id}`);
+      
+      if (response.ok) {
+        const data = await response.json();
+        setTransactions(data);
+      }
+    } catch (error) {
+      console.error('Error refreshing transactions:', error);
     }
   };
 
@@ -104,21 +115,10 @@ export const WalletProvider: React.FC<{ children: ReactNode }> = ({ children }) 
         user.walletBalance = data.newBalance;
         localStorage.setItem('user', JSON.stringify(user));
 
-        // Add transaction
-        const newTransaction: Transaction = {
-          id: Date.now().toString(),
-          type: 'credit',
-          title: 'Money Added',
-          subtitle: 'Added to wallet',
-          amount: amount,
-          date: new Date().toLocaleDateString(),
-          time: new Date().toLocaleTimeString(),
-          category: 'add_money'
-        };
+        // Refresh transactions to show the new transaction
+        await refreshTransactions();
 
-        const updatedTransactions = [newTransaction, ...transactions];
-        setTransactions(updatedTransactions);
-        localStorage.setItem('transactions', JSON.stringify(updatedTransactions));
+        return data;
       } else {
         throw new Error(data.error || 'Failed to add money');
       }
@@ -128,8 +128,8 @@ export const WalletProvider: React.FC<{ children: ReactNode }> = ({ children }) 
     }
   };
 
-  // Send money from wallet
-  const sendMoney = async (amount: number, recipient: string) => {
+  // Send money to another user
+  const sendMoney = async (amount: number, recipientUsername: string) => {
     const userStr = localStorage.getItem('user');
     if (!userStr) throw new Error('User not logged in');
 
@@ -142,6 +142,7 @@ export const WalletProvider: React.FC<{ children: ReactNode }> = ({ children }) 
         },
         body: JSON.stringify({
           userId: user.id,
+          recipientUsername: recipientUsername,
           amount: amount
         })
       });
@@ -156,21 +157,10 @@ export const WalletProvider: React.FC<{ children: ReactNode }> = ({ children }) 
         user.walletBalance = data.newBalance;
         localStorage.setItem('user', JSON.stringify(user));
 
-        // Add transaction
-        const newTransaction: Transaction = {
-          id: Date.now().toString(),
-          type: 'debit',
-          title: 'Money Sent',
-          subtitle: `To ${recipient}`,
-          amount: amount,
-          date: new Date().toLocaleDateString(),
-          time: new Date().toLocaleTimeString(),
-          category: 'money_sent'
-        };
+        // Refresh transactions to show the new transaction
+        await refreshTransactions();
 
-        const updatedTransactions = [newTransaction, ...transactions];
-        setTransactions(updatedTransactions);
-        localStorage.setItem('transactions', JSON.stringify(updatedTransactions));
+        return data;
       } else {
         throw new Error(data.error || 'Failed to send money');
       }
@@ -186,7 +176,8 @@ export const WalletProvider: React.FC<{ children: ReactNode }> = ({ children }) 
       transactions,
       addMoney,
       sendMoney,
-      refreshBalance
+      refreshBalance,
+      refreshTransactions
     }}>
       {children}
     </WalletContext.Provider>
